@@ -1,0 +1,30 @@
+services:
+  # ── Backend API ──────────────────────────────────────────────────────────────
+  - type: web
+    name: pdf-summarizer-api
+    runtime: python
+    plan: standard          # T5 model needs ~500 MB RAM — free tier may OOM
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pdf-summarizer-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true   # Render generates a random secret
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+
+  # ── Frontend (static site) ───────────────────────────────────────────────────
+  - type: web
+    name: pdf-summarizer-frontend
+    runtime: static
+    staticPublishPath: ./frontend
+    buildCommand: echo "No build needed"
+    envVars: []
+
+# ── PostgreSQL ───────────────────────────────────────────────────────────────
+databases:
+  - name: pdf-summarizer-db
+    plan: free

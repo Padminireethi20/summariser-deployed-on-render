@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.env.*
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# DB
+*.db
+*.sqlite3
+
+# Model cache (large — let Render download on deploy)
+# If you want to pre-cache, remove this line
+~/.cache/huggingface/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

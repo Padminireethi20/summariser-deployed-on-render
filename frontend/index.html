@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Summarizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Variables ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0e0e10;
+      --surface:   #18181c;
+      --border:    #2a2a30;
+      --accent:    #c8f55a;
+      --accent2:   #5af5c0;
+      --muted:     #666672;
+      --text:      #e8e8ee;
+      --text-dim:  #9999a8;
+      --danger:    #f55a5a;
+      --radius:    12px;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-mono:  'DM Mono', monospace;
+      --font-sans:  'DM Sans', system-ui, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    header {
+      padding: 24px 40px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .logo-mark {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .logo-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px 6px 8px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .user-pill .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent2);
+      box-shadow: 0 0 6px var(--accent2);
+    }
+    .user-pill strong { color: var(--text); font-weight: 500; }
+    #btn-logout {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-left: 6px;
+      transition: color 0.2s;
+    }
+    #btn-logout:hover { color: var(--danger); }
+
+    main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    /* ── Cards ─────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px;
+      width: 100%;
+      max-width: 480px;
+      animation: fadeUp 0.35s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-title {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 28px;
+      margin-bottom: 6px;
+      line-height: 1.2;
+    }
+    .card-sub {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── Form elements ──────────────────────────────────────────────── */
+    .field { margin-bottom: 18px; }
+    label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 8px;
+      border: none;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0e0e10;
+    }
+    .btn-primary:hover { background: #d4ff60; box-shadow: 0 0 20px rgba(200,245,90,0.3); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-msg {
+      background: rgba(245,90,90,0.08);
+      border: 1px solid rgba(245,90,90,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 14px;
+      display: none;
+    }
+
+    /* ── Upload area ────────────────────────────────────────────────── */
+    .upload-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(200,245,90,0.04);
+    }
+    .upload-icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+      display: block;
+    }
+    .upload-title {
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .upload-sub {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+    #file-input { display: none; }
+
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: rgba(200,245,90,0.06);
+      border: 1px solid rgba(200,245,90,0.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+    .file-selected .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      color: var(--accent);
+    }
+    .file-clear {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+    .file-clear:hover { color: var(--danger); }
+
+    /* ── Window info bar ────────────────────────────────────────────── */
+    .window-info {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 14px;
+      gap: 6px;
+    }
+    .window-info .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(90,245,192,0.1);
+      color: var(--accent2);
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    /* ── Progress ────────────────────────────────────────────────────── */
+    .progress-wrap {
+      display: none;
+      margin-top: 18px;
+    }
+    .progress-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.3s ease;
+      animation: shimmer 1.5s infinite;
+      background-size: 200% 100%;
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+
+    /* ── Result card ────────────────────────────────────────────────── */
+    #result-card { display: none; max-width: 640px; }
+
+    .result-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .meta-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+    .meta-chip.warn {
+      border-color: rgba(245,200,90,0.4);
+      color: #f5c85a;
+      background: rgba(245,200,90,0.06);
+    }
+
+    .summary-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      line-height: 1.75;
+      font-size: 15px;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .btn-again {
+      width: auto;
+      padding: 10px 24px;
+      margin-top: 20px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-again:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Footer ─────────────────────────────────────────────────────── */
+    footer {
+      padding: 16px 40px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Sections toggle ────────────────────────────────────────────── */
+    #login-section, #upload-section { display: none; }
+    #login-section.visible { display: flex; }
+    #upload-section.visible { display: block; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <span class="logo-mark">Distill</span>
+      <span class="logo-sub">PDF → Summary</span>
+    </div>
+    <div id="user-info" style="display:none">
+      <div class="user-pill">
+        <span class="dot"></span>
+        <strong id="username-display"></strong>
+        <button id="btn-logout">logout</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main ────────────────────────────────────────────────────── -->
+  <main>
+
+    <!-- Login -->
+    <section id="login-section" style="justify-content:center; align-items:center; width:100%">
+      <div class="card">
+        <h1 class="card-title">Sign in</h1>
+        <p class="card-sub">Access is restricted to registered users.<br>Use one of the 5 demo accounts.</p>
+
+        <div class="field">
+          <label for="inp-username">Username</label>
+          <input type="text" id="inp-username" placeholder="alice" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="inp-password">Password</label>
+          <input type="password" id="inp-password" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <button class="btn btn-primary" id="btn-login">Sign in →</button>
+
+        <div class="error-msg" id="login-error"></div>
+
+        <div style="margin-top:28px; border-top:1px solid var(--border); padding-top:20px">
+          <p style="font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.08em">Demo accounts</p>
+          <div style="display:grid; gap:6px">
+            <div class="meta-chip" style="border-radius:6px; padding:6px 12px; cursor:pointer; transition:background 0.2s;" onclick="fillLogin('alice','alice123')">alice / alice123</div>
+            <div class="meta-chip" style="border-radius:6px; padding:6px 12px; cursor:pointer; transition:background 0.2s;" onclick="fillLogin('bob','bob456')">bob / bob456</div>
+            <div class="meta-chip" style="border-radius:6px; padding:6px 12px; cursor:pointer; transition:background 0.2s;" onclick="fillLogin('charlie','charlie789')">charlie / charlie789</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload -->
+    <section id="upload-section" style="width:100%; max-width:640px; margin:0 auto">
+
+      <div class="card" id="upload-card">
+        <h1 class="card-title">Summarize a PDF</h1>
+        <p class="card-sub">Upload any text-based PDF. The first 1,800 characters are fed to T5-small for summarization.</p>
+
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <span class="upload-icon">📄</span>
+          <p class="upload-title">Drop your PDF here</p>
+          <p class="upload-sub">or click to browse</p>
+          <input type="file" id="file-input" accept=".pdf" />
+        </div>
+
+        <div class="file-selected" id="file-selected">
+          <span>📎</span>
+          <span class="file-name" id="file-name-label"></span>
+          <button class="file-clear" id="btn-clear-file">✕</button>
+        </div>
+
+        <div class="window-info" id="window-info" style="display:flex; margin-top:14px">
+          <span class="tag">T5-SMALL</span>
+          &nbsp;Input window: <strong style="color:var(--text)">1,800 chars</strong> · Output: <strong style="color:var(--text)">200 tokens max</strong>
+        </div>
+
+        <button class="btn btn-primary" id="btn-summarize" disabled style="margin-top:18px">
+          Generate summary →
+        </button>
+
+        <div class="progress-wrap" id="progress-wrap">
+          <p class="progress-label" id="progress-label">Extracting text…</p>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+
+        <div class="error-msg" id="upload-error"></div>
+      </div>
+
+      <!-- Result -->
+      <div class="card" id="result-card" style="margin-top:20px">
+        <h2 class="card-title">Summary</h2>
+        <div class="result-meta" id="result-meta"></div>
+        <div class="summary-box" id="summary-text"></div>
+        <button class="btn-again" onclick="resetUpload()">← Summarize another</button>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>
+    <span>Distill · T5-small</span>
+    <span id="api-url-display"></span>
+  </footer>
+</div>
+
+<script>
+  // ── Config ────────────────────────────────────────────────────────────────
+  // Change this to your Render backend URL after deploying
+  // If frontend and backend are on same origin, use relative path ""
+  const API_BASE = window.location.hostname === "localhost"
+    ? "http://localhost:8000"
+    : "https://pdf-summarizer-api.onrender.com"; // ← UPDATE THIS AFTER DEPLOY
+
+  document.getElementById("api-url-display").textContent = API_BASE;
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let token = localStorage.getItem("auth_token");
+  let currentUser = localStorage.getItem("auth_user");
+  let selectedFile = null;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  function init() {
+    if (token && currentUser) {
+      showUpload();
+    } else {
+      showLogin();
+    }
+  }
+
+  function showLogin() {
+    document.getElementById("login-section").classList.add("visible");
+    document.getElementById("upload-section").classList.remove("visible");
+    document.getElementById("user-info").style.display = "none";
+  }
+
+  function showUpload() {
+    document.getElementById("login-section").classList.remove("visible");
+    document.getElementById("upload-section").classList.add("visible");
+    document.getElementById("user-info").style.display = "block";
+    document.getElementById("username-display").textContent = currentUser;
+  }
+
+  // ── Login ─────────────────────────────────────────────────────────────────
+  function fillLogin(u, p) {
+    document.getElementById("inp-username").value = u;
+    document.getElementById("inp-password").value = p;
+  }
+
+  document.getElementById("btn-login").addEventListener("click", doLogin);
+  document.getElementById("inp-password").addEventListener("keydown", e => {
+    if (e.key === "Enter") doLogin();
+  });
+
+  async function doLogin() {
+    const username = document.getElementById("inp-username").value.trim();
+    const password = document.getElementById("inp-password").value;
+    const errEl = document.getElementById("login-error");
+    const btn = document.getElementById("btn-login");
+
+    errEl.style.display = "none";
+    if (!username || !password) {
+      showError(errEl, "Please enter username and password.");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(errEl, data.detail || "Login failed.");
+        return;
+      }
+
+      token = data.access_token;
+      currentUser = username;
+      localStorage.setItem("auth_token", token);
+      localStorage.setItem("auth_user", currentUser);
+      showUpload();
+
+    } catch (err) {
+      showError(errEl, "Could not reach the server. Is the API running?");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Sign in →";
+    }
+  }
+
+  document.getElementById("btn-logout").addEventListener("click", () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    token = null; currentUser = null;
+    showLogin();
+  });
+
+  // ── File selection ─────────────────────────────────────────────────────────
+  const fileInput = document.getElementById("file-input");
+  const dropZone = document.getElementById("drop-zone");
+
+  fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
+
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file || !file.name.endsWith(".pdf")) {
+      alert("Please select a PDF file.");
+      return;
+    }
+    selectedFile = file;
+    document.getElementById("file-name-label").textContent = file.name;
+    document.getElementById("file-selected").style.display = "flex";
+    document.getElementById("btn-summarize").disabled = false;
+    document.getElementById("upload-error").style.display = "none";
+  }
+
+  document.getElementById("btn-clear-file").addEventListener("click", () => {
+    selectedFile = null;
+    fileInput.value = "";
+    document.getElementById("file-selected").style.display = "none";
+    document.getElementById("btn-summarize").disabled = true;
+  });
+
+  // ── Summarize ─────────────────────────────────────────────────────────────
+  document.getElementById("btn-summarize").addEventListener("click", doSummarize);
+
+  async function doSummarize() {
+    if (!selectedFile) return;
+    const errEl = document.getElementById("upload-error");
+    const btn = document.getElementById("btn-summarize");
+    const progressWrap = document.getElementById("progress-wrap");
+    const progressFill = document.getElementById("progress-fill");
+    const progressLabel = document.getElementById("progress-label");
+
+    errEl.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Working…";
+    progressWrap.style.display = "block";
+
+    // Fake progress steps
+    const steps = [
+      [20, "Uploading PDF…"],
+      [45, "Extracting text…"],
+      [70, "Running T5-small…"],
+      [90, "Finalizing…"],
+    ];
+    let stepIdx = 0;
+    const tick = setInterval(() => {
+      if (stepIdx < steps.length) {
+        progressFill.style.width = steps[stepIdx][0] + "%";
+        progressLabel.textContent = steps[stepIdx][1];
+        stepIdx++;
+      }
+    }, 800);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const res = await fetch(`${API_BASE}/api/summarize`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+        body: formData
+      });
+
+      clearInterval(tick);
+
+      if (res.status === 401) {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+        showLogin();
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(errEl, data.detail || "Summarization failed.");
+        progressWrap.style.display = "none";
+        return;
+      }
+
+      progressFill.style.width = "100%";
+      progressLabel.textContent = "Done!";
+      setTimeout(() => { progressWrap.style.display = "none"; }, 500);
+
+      showResult(data);
+
+    } catch (err) {
+      clearInterval(tick);
+      progressWrap.style.display = "none";
+      showError(errEl, "Request failed. Is the API running?");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Generate summary →";
+    }
+  }
+
+  function showResult(data) {
+    const metaEl = document.getElementById("result-meta");
+    const textEl = document.getElementById("summary-text");
+    const resultCard = document.getElementById("result-card");
+
+    const chips = [
+      `<span class="meta-chip">${data.filename}</span>`,
+      `<span class="meta-chip">${data.extracted_chars.toLocaleString()} chars extracted</span>`,
+      `<span class="meta-chip">${data.window_used_chars} / ${data.window_limit_chars} window used</span>`,
+    ];
+    if (data.truncated) {
+      chips.push(`<span class="meta-chip warn">⚠ Truncated to window limit</span>`);
+    }
+    metaEl.innerHTML = chips.join("");
+    textEl.textContent = data.summary;
+    resultCard.style.display = "block";
+    resultCard.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function resetUpload() {
+    selectedFile = null;
+    fileInput.value = "";
+    document.getElementById("file-selected").style.display = "none";
+    document.getElementById("btn-summarize").disabled = true;
+    document.getElementById("result-card").style.display = "none";
+    document.getElementById("upload-error").style.display = "none";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function showError(el, msg) {
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  init();
+</script>
+</body>
+</html>
