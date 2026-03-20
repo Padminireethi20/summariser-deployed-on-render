@@ -1,10 +1,12 @@
 import io
-import os
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 import pdfplumber
-from transformers import T5ForConditionalGeneration, T5Tokenizer
-import torch
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.summarizers.lsa import LsaSummarizer
+from sumy.nlp.stemmers import Stemmer
+from sumy.utils import get_stop_words
 
 from .auth import get_current_user
 from .models import User, SummaryLog
@@ -12,23 +14,13 @@ from .database import get_db
 
 router = APIRouter()
 
-# ── T5-small config ──────────────────────────────────────────────────────────
-MODEL_NAME = "t5-small"
-# T5-small has a 512-token input limit. We stay well under that.
-MAX_INPUT_CHARS = 1800   # ~450 tokens worth of chars — safe window for t5-small
-MAX_NEW_TOKENS  = 200    # summary output length cap
+# ── Sumy config ───────────────────────────────────────────────────────────────
+LANGUAGE        = "english"
+MAX_INPUT_CHARS = 1800   # fixed window — same as before so the UI stat still makes sense
+SUMMARY_SENTENCES = 5    # number of sentences to extract
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Load model once at module import (cached after first cold start)
-print("[model] Loading T5-small…")
-tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
-model     = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
-model.eval()
-print("[model] T5-small ready.")
-
-
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract plain text from a PDF using pdfplumber."""
     text_parts = []
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
@@ -39,30 +31,13 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
 
 
 def summarize_text(text: str) -> str:
-    """Run T5-small summarization on text (truncated to MAX_INPUT_CHARS)."""
-    # Truncate to the fixed window
     truncated = text[:MAX_INPUT_CHARS]
-
-    # T5 expects the "summarize: " prefix
-    input_text = "summarize: " + truncated
-
-    inputs = tokenizer.encode(
-        input_text,
-        return_tensors="pt",
-        max_length=512,
-        truncation=True
-    )
-
-    with torch.no_grad():
-        summary_ids = model.generate(
-            inputs,
-            max_new_tokens=MAX_NEW_TOKENS,
-            num_beams=4,
-            early_stopping=True
-        )
-
-    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    return summary
+    parser = PlaintextParser.from_string(truncated, Tokenizer(LANGUAGE))
+    stemmer = Stemmer(LANGUAGE)
+    summarizer = LsaSummarizer(stemmer)
+    summarizer.stop_words = get_stop_words(LANGUAGE)
+    sentences = summarizer(parser.document, SUMMARY_SENTENCES)
+    return " ".join(str(s) for s in sentences)
 
 
 @router.post("/summarize")
